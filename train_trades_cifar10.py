@@ -159,7 +159,7 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         # adjust learning rate for SGD
-        adjust_learning_rate(optimizer, epoch)
+        # adjust_learning_rate(optimizer, epoch)
         print('Epoch: {}/{}, lr={}'.format(epoch, args.epochs, lr_scheduler.get_last_lr()[0]))
         # adversarial training
         train(args, model, device, train_loader, optimizer, epoch)
@@ -169,6 +169,7 @@ def main():
         # eval_train(model, device, train_loader)
         # eval_test(model, device, test_loader)
         # print('================================================================')
+        lr_scheduler.step()
 
         # save checkpoint
         if epoch % args.save_freq == 0:
