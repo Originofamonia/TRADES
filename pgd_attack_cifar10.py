@@ -11,9 +11,8 @@ from torchvision import datasets, transforms
 from models.wideresnet import *
 from models.resnet import *
 
-
 parser = argparse.ArgumentParser(description='PyTorch CIFAR PGD Attack Evaluation')
-parser.add_argument('--test-batch-size', type=int, default=200, metavar='N',
+parser.add_argument('--test-batch-size', type=int, default=100, metavar='N',
                     help='input batch size for testing (default: 200)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
@@ -46,8 +45,8 @@ device = torch.device("cuda" if use_cuda else "cpu")
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
 # set up data loader
-transform_test = transforms.Compose([transforms.ToTensor(),])
-testset = torchvision.datasets.CIFAR10(root='../data', train=False, download=True, transform=transform_test)
+transform_test = transforms.Compose([transforms.ToTensor(), ])
+testset = torchvision.datasets.CIFAR10(root='data', train=False, download=True, transform=transform_test)
 test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 
@@ -152,7 +151,6 @@ def eval_adv_test_blackbox(model_target, model_source, device, test_loader):
 
 
 def main():
-
     if args.white_box_attack:
         # white-box attack
         print('pgd white-box attack')
