@@ -7,17 +7,19 @@ import torch.nn.functional as F
 import torchvision
 import torch.optim as optim
 from torchvision import datasets, transforms
+from tqdm import tqdm
 
 from models.wideresnet import *
 from models.resnet import *
 from trades import trades_loss
+from pgd_attack_cifar10 import eval_adv_test_whitebox
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR TRADES Adversarial Training')
-parser.add_argument('--batch-size', type=int, default=100, metavar='N',
+parser.add_argument('--batch-size', type=int, default=50, metavar='N',
                     help='input batch size for training (default: 128)')
-parser.add_argument('--test-batch-size', type=int, default=100, metavar='N',
+parser.add_argument('--test-batch-size', type=int, default=50, metavar='N',
                     help='input batch size for testing (default: 128)')
-parser.add_argument('--epochs', type=int, default=76, metavar='N',
+parser.add_argument('--epochs', type=int, default=105, metavar='N',
                     help='number of epochs to train')
 parser.add_argument('--weight-decay', '--wd', default=2e-4,
                     type=float, metavar='W')
@@ -35,13 +37,13 @@ parser.add_argument('--step-size', default=0.007,
                     help='perturb step size')
 parser.add_argument('--beta', default=6.0,
                     help='regularization, i.e., 1/lambda in TRADES')
-parser.add_argument('--seed', type=int, default=1, metavar='S',
+parser.add_argument('--seed', type=int, default=19, metavar='S',
                     help='random seed (default: 1)')
-parser.add_argument('--log-interval', type=int, default=100, metavar='N',
+parser.add_argument('--log-interval', type=int, default=15, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--model-dir', default='./model-cifar-wideResNet',
                     help='directory of model for saving checkpoint')
-parser.add_argument('--save-freq', '-s', default=1, type=int, metavar='N',
+parser.add_argument('--save-freq', '-s', default=10, type=int, metavar='N',
                     help='save frequency')
 
 args = parser.parse_args()
@@ -72,28 +74,30 @@ test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_si
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
+    iterator = tqdm(train_loader, ncols=0, leave=False)
+    for batch_idx, (data, target) in enumerate(iterator):
         data, target = data.to(device), target.to(device)
-
         optimizer.zero_grad()
 
         # calculate robust loss
-        loss = trades_loss(model=model,
-                           x_natural=data,
-                           y=target,
-                           optimizer=optimizer,
-                           step_size=args.step_size,
-                           epsilon=args.epsilon,
-                           perturb_steps=args.num_steps,
-                           beta=args.beta)
+        loss_natural, loss_robust = trades_loss(model=model,
+                                                x_natural=data,
+                                                y=target,
+                                                optimizer=optimizer,
+                                                step_size=args.step_size,
+                                                epsilon=args.epsilon,
+                                                perturb_steps=args.num_steps,
+                                                beta=args.beta)
+        loss = loss_natural + loss_robust
         loss.backward()
         optimizer.step()
 
-        # print progress
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                       100. * batch_idx / len(train_loader), loss.item()))
+        desc = 'l_nat:' + "{:10.4f}".format(loss_natural.item()) + 'l_rob:' + "{:10.4f}".format(loss_robust.item())
+        iterator.set_description(desc=desc)
+        # if batch_idx % args.log_interval == 0:
+        #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+        #         epoch, batch_idx * len(data), len(train_loader.dataset),
+        #         100. * batch_idx / len(train_loader), loss.item()))
 
 
 def eval_train(model, device, train_loader):
@@ -151,26 +155,28 @@ def main():
     # init model, ResNet18() can be also used here for training
     model = WideResNet().to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[75, 90, 100], gamma=0.1)
 
     for epoch in range(1, args.epochs + 1):
         # adjust learning rate for SGD
         adjust_learning_rate(optimizer, epoch)
-
+        print('Epoch: {}/{}, lr={}'.format(epoch, args.epochs, lr_scheduler.get_last_lr()[0]))
         # adversarial training
         train(args, model, device, train_loader, optimizer, epoch)
 
         # evaluation on natural examples
-        print('================================================================')
-        eval_train(model, device, train_loader)
-        eval_test(model, device, test_loader)
-        print('================================================================')
+        # print('================================================================')
+        # eval_train(model, device, train_loader)
+        # eval_test(model, device, test_loader)
+        # print('================================================================')
 
         # save checkpoint
         if epoch % args.save_freq == 0:
-            torch.save(model.state_dict(),
-                       os.path.join(model_dir, 'model-wideres-epoch{}.pt'.format(epoch)))
-            torch.save(optimizer.state_dict(),
-                       os.path.join(model_dir, 'opt-wideres-checkpoint_epoch{}.tar'.format(epoch)))
+            eval_adv_test_whitebox(model, device, test_loader)
+            # torch.save(model.state_dict(),
+            #            os.path.join(model_dir, 'model-wideres-epoch{}.pt'.format(epoch)))
+            # torch.save(optimizer.state_dict(),
+            #            os.path.join(model_dir, 'opt-wideres-checkpoint_epoch{}.tar'.format(epoch)))
 
 
 if __name__ == '__main__':

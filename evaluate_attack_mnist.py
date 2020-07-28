@@ -5,7 +5,6 @@ from torch.autograd import Variable
 from models.small_cnn import *
 import numpy as np
 
-
 parser = argparse.ArgumentParser(description='PyTorch MNIST Attack Evaluation')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')

@@ -12,7 +12,6 @@ from models.wideresnet import *
 from models.resnet import *
 import numpy as np
 
-
 parser = argparse.ArgumentParser(description='PyTorch CIFAR Attack Evaluation')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
