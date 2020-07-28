@@ -20,7 +20,7 @@ def trades_loss(model,
                 optimizer,
                 step_size=0.003,
                 epsilon=0.031,
-                perturb_steps=10,
+                perturb_steps=20,
                 beta=1.0,
                 distance='l_inf'):
     # define KL-loss
