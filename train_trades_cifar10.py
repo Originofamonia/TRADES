@@ -15,7 +15,7 @@ from trades import trades_loss
 from pgd_attack_cifar10 import eval_adv_test_whitebox
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR TRADES Adversarial Training')
-parser.add_argument('--batch-size', type=int, default=50, metavar='N',
+parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 128)')
 parser.add_argument('--test-batch-size', type=int, default=50, metavar='N',
                     help='input batch size for testing (default: 128)')
@@ -43,7 +43,7 @@ parser.add_argument('--log-interval', type=int, default=15, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--model-dir', default='./model-cifar-wideResNet',
                     help='directory of model for saving checkpoint')
-parser.add_argument('--save-freq', '-s', default=10, type=int, metavar='N',
+parser.add_argument('--save-freq', '-s', default=15, type=int, metavar='N',
                     help='save frequency')
 
 args = parser.parse_args()
@@ -100,25 +100,6 @@ def train(args, model, device, train_loader, optimizer, epoch):
         #         100. * batch_idx / len(train_loader), loss.item()))
 
 
-def eval_train(model, device, train_loader):
-    model.eval()
-    train_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in train_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            train_loss += F.cross_entropy(output, target, size_average=False).item()
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum().item()
-    train_loss /= len(train_loader.dataset)
-    print('Training: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-        train_loss, correct, len(train_loader.dataset),
-        100. * correct / len(train_loader.dataset)))
-    training_accuracy = correct / len(train_loader.dataset)
-    return train_loss, training_accuracy
-
-
 def eval_test(model, device, test_loader):
     model.eval()
     test_loss = 0
@@ -160,7 +141,7 @@ def main():
     for epoch in range(1, args.epochs + 1):
         # adjust learning rate for SGD
         # adjust_learning_rate(optimizer, epoch)
-        print('Epoch: {}/{}, lr={}'.format(epoch, args.epochs, lr_scheduler.get_last_lr()[0]))
+        print('Epoch: {}/{}, lr={:.4f}'.format(epoch, args.epochs, lr_scheduler.get_last_lr()[0]))
         # adversarial training
         train(args, model, device, train_loader, optimizer, epoch)
 
@@ -178,6 +159,8 @@ def main():
             #            os.path.join(model_dir, 'model-wideres-epoch{}.pt'.format(epoch)))
             # torch.save(optimizer.state_dict(),
             #            os.path.join(model_dir, 'opt-wideres-checkpoint_epoch{}.tar'.format(epoch)))
+
+    eval_adv_test_whitebox(model, device, test_loader)
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ import os
 import argparse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from tqdm import tqdm
 import torchvision
 from torch.autograd import Variable
 import torch.optim as optim
@@ -76,7 +76,7 @@ def _pgd_whitebox(model,
         X_pgd = Variable(X.data + eta, requires_grad=True)
         X_pgd = Variable(torch.clamp(X_pgd, 0, 1.0), requires_grad=True)
     err_pgd = (model(X_pgd).data.max(1)[1] != y.data).float().sum()
-    print('err pgd (white-box): ', err_pgd)
+    # print('err pgd (white-box): ', err_pgd)
     return err, err_pgd
 
 
@@ -107,7 +107,7 @@ def _pgd_blackbox(model_target,
         X_pgd = Variable(torch.clamp(X_pgd, 0, 1.0), requires_grad=True)
 
     err_pgd = (model_target(X_pgd).data.max(1)[1] != y.data).float().sum()
-    print('err pgd black-box: ', err_pgd)
+    # print('err pgd black-box: ', err_pgd)
     return err, err_pgd
 
 
@@ -116,18 +116,20 @@ def eval_adv_test_whitebox(model, device, test_loader):
     evaluate model by white-box attack
     """
     model.eval()
+    pbar = tqdm(test_loader)
     robust_err_total = 0
     natural_err_total = 0
 
-    for data, target in test_loader:
+    for i, (data, target) in enumerate(pbar):
         data, target = data.to(device), target.to(device)
         # pgd attack
         X, y = Variable(data, requires_grad=True), Variable(target)
         err_natural, err_robust = _pgd_whitebox(model, X, y)
         robust_err_total += err_robust
         natural_err_total += err_natural
-    print('natural_err_total: ', natural_err_total)
-    print('robust_err_total: ', robust_err_total)
+    nat_acc = 1 - natural_err_total / len(test_loader)
+    rob_acc = 1 - robust_err_total / len(test_loader)
+    print('natural_err_total, robust_err_total: {}, {}'.format(nat_acc, rob_acc))
 
 
 def eval_adv_test_blackbox(model_target, model_source, device, test_loader):
